@@ -43,10 +43,12 @@ class LinearClassifier(nn.Module):
         loss, pred_labels = None, None
 
         if labels is None:
+            # Test dataset 
             pred_labels = self._pred_labels(_logits)    
         else:
             loss = self.loss_fct(_logits.view(-1, self.num_labels), labels.view(-1))
             if not no_decode:
+                # Validation set
                 pred_labels = self._pred_labels(_logits)
 
         return NEROutputs(loss, pred_labels)
@@ -55,30 +57,35 @@ class LinearClassifier(nn.Module):
 class CRFClassifier(nn.Module):
     def __init__(self, hidden_size: int, num_labels: int, dropout: float):
         super().__init__()
-        self.dropout = nn.Dropout(dropout)
+        self.num_labels = num_labels
 
-        '''NOTE: This is where to modify for CRF.
+        self.layers = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(hidden_size, num_labels)
+        )
 
-        '''
+        self.crf    = CRF(num_labels, batch_first=True)
 
-    def _pred_labels(self):
-        '''NOTE: This is where to modify for CRF.
-        
-        You need to finish the code to predict labels.
+    def _pred_labels(self, emissions, mask):
 
-        You can add input arguments.
-        
-        '''
-        # return pred_labels
+        pred_labels = self.crf.decode(emissions, mask.byte())
+        return [torch.tensor(pred_label, device=emissions.device) for pred_label in pred_labels]
 
     def forward(self, hidden_states, attention_mask, labels=None, no_decode=False, label_pad_token_id=NER_PAD_ID):    
-        '''NOTE: This is where to modify for CRF.
-        
-        You need to finish the code to compute loss and predict labels.
+      
+        _emissions = self.layers(hidden_states)
+        loss, pred_labels = None, None
 
+        if labels is None:
+            # Test dataset 
+            pred_labels = self._pred_labels(_emissions, attention_mask)    
+        else:
+            loss = -1 * self.crf(_emissions, labels, mask=attention_mask.byte())
+            if not no_decode:
+                # Validation set
+                pred_labels = self._pred_labels(_emissions, attention_mask)
 
-        '''
-        # return NEROutputs(loss, pred_labels)
+        return NEROutputs(loss, pred_labels)
 
 
 def _group_ner_outputs(output1: NEROutputs, output2: NEROutputs):
@@ -138,7 +145,6 @@ class BertForLinearHeadNER(BertPreTrainedModel):
         output = self.classifier.forward(sequence_output, labels, no_decode=no_decode)
         return output
 
-
 class BertForLinearHeadNestedNER(BertPreTrainedModel):
     config_class = BertConfig
     base_model_prefix = "bert"
@@ -148,9 +154,10 @@ class BertForLinearHeadNestedNER(BertPreTrainedModel):
         self.config = config
 
         self.bert = BertModel(config)
-        '''NOTE: This is where to modify for Nested NER.
 
-        '''
+        self.classifier1 = LinearClassifier(config.hidden_size, num_labels1, config.hidden_dropout_prob)
+        self.classifier2 = LinearClassifier(config.hidden_size, num_labels2, config.hidden_dropout_prob)
+
         self.init_weights()
 
     def forward(
@@ -185,6 +192,9 @@ class BertForLinearHeadNestedNER(BertPreTrainedModel):
         Use the above function _group_ner_outputs for combining results.
 
         '''
+        output1 = self.classifier1.forward(sequence_output, labels, no_decode=no_decode)
+        output2 = self.classifier2.forward(sequence_output, labels, no_decode=no_decode)
+        return _group_ner_outputs(output1, output2)
 
 
 class BertForCRFHeadNER(BertPreTrainedModel):
