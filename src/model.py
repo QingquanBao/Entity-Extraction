@@ -7,6 +7,7 @@ import torch
 from dataclasses import dataclass
 from torch import nn
 from torch.nn import CrossEntropyLoss
+from torch.nn.utils.rnn import pad_sequence
 from torchcrf import CRF
 from transformers import BertPreTrainedModel, BertConfig, BertModel
 from transformers.file_utils import ModelOutput
@@ -69,7 +70,9 @@ class CRFClassifier(nn.Module):
     def _pred_labels(self, emissions, mask):
 
         pred_labels = self.crf.decode(emissions, mask.byte())
-        return [torch.tensor(pred_label, device=emissions.device) for pred_label in pred_labels]
+        out_ = pad_sequence([torch.tensor(pred_label, device=emissions.device) for pred_label in pred_labels],
+                             batch_first=True)
+        return out_
 
     def forward(self, hidden_states, attention_mask, labels=None, no_decode=False, label_pad_token_id=NER_PAD_ID):    
       
@@ -193,7 +196,7 @@ class BertForLinearHeadNestedNER(BertPreTrainedModel):
 
         '''
         output1 = self.classifier1.forward(sequence_output, labels, no_decode=no_decode)
-        output2 = self.classifier2.forward(sequence_output, labels, no_decode=no_decode)
+        output2 = self.classifier2.forward(sequence_output, labels2, no_decode=no_decode)
         return _group_ner_outputs(output1, output2)
 
 

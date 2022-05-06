@@ -128,7 +128,7 @@ def extract_entities(batch_labels_or_preds: np.ndarray, for_nested_ner: bool = F
                             for lab in cur_label.keys():
                                 if cur_label[lab] == max_cnt:
                                     max_label.append(lab)
-                            for lab in reversed(_LABEL_RANK):
+                            for lab in reversed(list(_LABEL_RANK.keys())):
                                 if lab in max_label:
                                     ll = lab
                                     break

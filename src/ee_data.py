@@ -74,6 +74,7 @@ class InputExample:
                 if not for_nested_ner:
                     _write_label(label, entity_type, start_idx, end_idx)
                 else:
+                    ### DONE
                     if entity_type != 'sym':
                         _write_label(label1, entity_type, start_idx, end_idx)
                     else:
@@ -213,7 +214,6 @@ class CollateFnForEE:
         if self.for_nested_ner:
             labels     = [x[1][0]  for x in inputs] if len(inputs[0]) > 1 else None
             labels2    = [x[1][1]  for x in inputs] if len(inputs[0]) > 1 else None
-
         else:
             labels     = [x[1]  for x in inputs] if len(inputs[0]) > 1 else None
     
