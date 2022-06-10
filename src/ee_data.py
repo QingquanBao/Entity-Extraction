@@ -3,10 +3,12 @@ import json
 import logging
 import pickle
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from itertools import repeat
 from os.path import join, exists
 from typing import List
+from random import choice, randint
+from copy import deepcopy
 
 import numpy as np
 import torch
@@ -87,6 +89,67 @@ class InputExample:
                 return self.sentence_id, self.text, [label1, label2]
 
 
+def _fusing_data(filename, data):
+    # 只加训练集
+    if 'train' in filename:
+        fused_num = 3000
+    else:
+        fused_num = 0
+    # 统计所有类型的entity
+    if fused_num > 0:
+        entity_dict = defaultdict(list)
+        for i in range(15000):
+            entity_list = data[i]['entities']
+            for dic in entity_list:
+                entity_dict[dic['type']].append(dic['entity'])
+
+    for i in range(fused_num):
+        # 两种增强方式
+        type = randint(1, 2)
+        # 直接叠加在一起
+        if type == 1:
+            new_data = dict()
+            d1 = choice(data)
+            d2 = choice(data)
+            while d2 == d1:
+                d2 = choice(data)
+            new_data['text'] = d1['text'] + d2['text']
+            new_data['entities'] = deepcopy(d1['entities'])
+            for e in deepcopy(d2['entities']):
+                e['start_idx'] += len(d1['text'])
+                e['end_idx'] += len(d1['text'])
+                new_data['entities'].append(e)
+
+        # 随机替换一个entity为其同类型的entity
+        else:
+            d1 = choice(data)
+            new_data = deepcopy(d1)
+            entity = deepcopy(choice(new_data['entities']))
+            new_entity = choice(entity_dict[entity['type']])
+            while new_entity == entity['entity']:
+                new_entity = choice(entity_dict[entity['type']])
+            new_data['text'] = new_data['text'].replace(entity['entity'], new_entity)
+            pos_dict = defaultdict(int)
+            rm_idx = []
+            for idx, e in enumerate(new_data['entities']):
+                if e['entity'] == entity['entity']:
+                    e['entity'] = new_entity
+                elif entity['entity'] in e['entity']:
+                    e['entity'] = e['entity'].replace(entity['entity'], new_entity)
+                start_idx = new_data['text'][pos_dict[e['entity']]:].find(e['entity'])
+                if start_idx == -1:
+                    rm_idx.append(idx)
+                else:
+                    end_idx = start_idx + len(e['entity']) - 1
+                    pos_dict[e['entity']] = end_idx + 1
+                    e['start_idx'] = start_idx
+                    e['end_idx'] = end_idx
+            for idx in rm_idx:
+                new_data['entities'].pop(idx)
+        data.append(new_data)
+
+    return data
+
 class EEDataloader:
     def __init__(self, cblue_root: str):
         self.cblue_root = cblue_root
@@ -95,7 +158,8 @@ class EEDataloader:
     @staticmethod
     def _load_json(filename: str) -> List[dict]:
         with open(filename, encoding="utf8") as f:
-            return json.load(f)
+            data = json.load(f)
+        return _fusing_data(filename, data)
 
     @staticmethod
     def _parse(cmeee_data: List[dict]) -> List[InputExample]:
@@ -260,7 +324,7 @@ if __name__ == '__main__':
     IS_NESTED = True
 
     tokenizer = BertTokenizer.from_pretrained(MODEL_NAME)
-    dataset = EEDataset(CBLUE_ROOT, mode="dev", max_length=10, tokenizer=tokenizer, for_nested_ner=IS_NESTED)
+    dataset = EEDataset(CBLUE_ROOT, mode="train", max_length=10, tokenizer=tokenizer, for_nested_ner=IS_NESTED)
 
     batch = [dataset[0], dataset[1], dataset[2]]
     inputs = CollateFnForEE(pad_token_id=tokenizer.pad_token_id, for_nested_ner=IS_NESTED)(batch)
