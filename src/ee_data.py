@@ -158,23 +158,26 @@ class EEDataloader:
         self.data_root = join(cblue_root, "CMeEE")
 
     @staticmethod
-    def _load_json(filename: str) -> List[dict]:
+    def _load_json(filename: str, fusion: bool=False) -> List[dict]:
         with open(filename, encoding="utf8") as f:
             data = json.load(f)
-        return _fusing_data(filename, data)
+        return _fusing_data(filename, data) if fusion else data
 
     @staticmethod
     def _parse(cmeee_data: List[dict]) -> List[InputExample]:
         return [InputExample(sentence_id=str(i), **data) for i, data in enumerate(cmeee_data)]
 
-    def get_data(self, mode: str):
+    def get_data(self, mode: str, fusion: bool):
         if mode not in ("train", "dev", "test"):
             raise ValueError(f"Unrecognized mode: {mode}")
-        return self._parse(self._load_json(join(self.data_root, f"CMeEE_{mode}.json")))
+        if mode == 'train':
+            return self._parse(self._load_json(join(self.data_root, f"CMeEE_{mode}.json"),fusion))
+        else:
+            return self._parse(self._load_json(join(self.data_root, f"CMeEE_{mode}.json")))
 
 
 class EEDataset(Dataset):
-    def __init__(self, cblue_root: str, mode: str, max_length: int, tokenizer, for_nested_ner: bool):
+    def __init__(self, cblue_root: str, mode: str, max_length: int, tokenizer, for_nested_ner: bool, fusion:bool):
         self.cblue_root = cblue_root
         self.data_root = join(cblue_root, "CMeEE")
         self.max_length = max_length
@@ -193,7 +196,7 @@ class EEDataset(Dataset):
                 self.examples, self.data = pickle.load(f)
             logger.info(f"Load cached data from {cache_file}")
         else:
-            self.examples = EEDataloader(cblue_root).get_data(mode) # get original data
+            self.examples = EEDataloader(cblue_root).get_data(mode,fusion) # get original data
             self.data = self._preprocess(self.examples, tokenizer) # preprocess
             with open(cache_file, 'wb') as f:
                 pickle.dump((self.examples, self.data), f)
