@@ -90,5 +90,6 @@ do
     \
     --cblue_root                  ${CBLUE_ROOT} \
     --max_length                  512 \
-    --label_names                 ${LABEL_NAMES[@]} 
+    --label_names                 ${LABEL_NAMES[@]} \
+    --fusion                      true \
 done
