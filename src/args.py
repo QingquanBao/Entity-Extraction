@@ -30,4 +30,5 @@ class ModelConstructArgs(_Args):
 class CBLUEDataArgs(_Args):
     cblue_root: str = field(metadata={"help": "CBLUE data root"})
     max_length: Optional[int] = field(default=128, metadata={"help": "Max sequence length"})
+    fusion: Optional[bool] = field(default=False, metadata={"help": "Whether to use data fusion"})
 

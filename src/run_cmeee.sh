@@ -1,3 +1,4 @@
+#!/bin/bash
 CBLUE_ROOT=../data/CBLUEDatasets
   
 MODEL_TYPE=bert
@@ -6,7 +7,7 @@ SEED=2023
 LABEL_NAMES=(labels)
 #TASK_ID=0
 
-for TASK_ID in 3  
+for TASK_ID in 0  
 do
   echo ${TASK_ID}
   case ${TASK_ID} in
@@ -85,11 +86,11 @@ do
     --model_type                  ${MODEL_TYPE} \
     --model_path                  ${MODEL_PATH} \
     --head_type                   ${HEAD_TYPE} \
-    --lr_decay                    true \
+    --lr_decay                    false \
     --swa                         false \
     \
     --cblue_root                  ${CBLUE_ROOT} \
     --max_length                  512 \
     --label_names                 ${LABEL_NAMES[@]} \
-    --fusion                      true \
+    --fusion                      false 
 done

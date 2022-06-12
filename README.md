@@ -1,5 +1,5 @@
 ## Dataset
-For pretraining, download [MedDialog](https://drive.google.com/drive/folders/11sglwm6-cY7gjeqlZaMxL_MDKDMLdhym) (here we choose 'processed-zh; version) and put it into `./data/`
+For pretraining, download [MedDialog](https://drive.google.com/drive/folders/11sglwm6-cY7gjeqlZaMxL_MDKDMLdhym) (here we choose 'processed-zh; version) and put it into `./data/train_data.json`
 
 For Entity extraction, see Ali Sky Pool
 
@@ -7,7 +7,7 @@ For Entity extraction, see Ali Sky Pool
 ### Pretrained in MedDialog
 ```bash
 cd src/
-python 
+python medlog_pretrain.py
 ```
 
 ### Entity Extration
