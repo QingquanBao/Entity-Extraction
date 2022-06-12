@@ -1,18 +1,8 @@
-#!/bin/bash
-#SBATCH --job-name=run_cmeee
-#SBATCH --partition=a100
-#SBATCH -N 1
-#SBATCH --gres=gpu:1
-#SBATCH -n 1
-#SBATCH --output=../logs/run_cmeee-%A.log
-#SBATCH --error=../logs/run_cmeee-%A.log
-
-
 CBLUE_ROOT=../data/CBLUEDatasets
   
 MODEL_TYPE=bert
 MODEL_PATH=../bert-base-chinese
-SEED=2022
+SEED=2023
 LABEL_NAMES=(labels)
 #TASK_ID=0
 
@@ -51,7 +41,7 @@ do
   OUTPUT_DIR=../ckpts/${MODEL_TYPE}_${HEAD_TYPE}_${SEED}
 
   PYTHONPATH=../.. \
-  python run_cmeee.py \
+  CUDA_VISIBLE_DEVICES=1 python run_cmeee.py \
     --output_dir                  ${OUTPUT_DIR} \
     --report_to                   none \
     --overwrite_output_dir        true \
@@ -95,6 +85,8 @@ do
     --model_type                  ${MODEL_TYPE} \
     --model_path                  ${MODEL_PATH} \
     --head_type                   ${HEAD_TYPE} \
+    --lr_decay                    true \
+    --swa                         false \
     \
     --cblue_root                  ${CBLUE_ROOT} \
     --max_length                  512 \

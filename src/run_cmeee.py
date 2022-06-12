@@ -5,14 +5,16 @@ from os.path import join
 from typing import List
 
 from sklearn.metrics import precision_recall_fscore_support
+from transformers import AdamW, get_scheduler
 from transformers.models.bert.modeling_bert import BertEmbeddings, BertAttention
 from transformers import set_seed, BertTokenizer, Trainer, HfArgumentParser, TrainingArguments, BertLayer
+from torch.optim.swa_utils import AveragedModel, SWALR
 
 from args import ModelConstructArgs, CBLUEDataArgs
 from logger import get_logger
 from ee_data import EE_label2id2, EEDataset, EE_NUM_LABELS1, EE_NUM_LABELS2, EE_NUM_LABELS, CollateFnForEE, \
     EE_label2id1, NER_PAD, EE_label2id
-from model import BertForCRFHeadNER, BertForLinearHeadNER,  BertForLinearHeadNestedNER, CRFClassifier, LinearClassifier
+from model import BertForCRFHeadNER, BertForLinearHeadNER, BertForLinearHeadNestedNER, BertForCRFHeadNestedNER, CRFClassifier, LinearClassifier
 from metrics import ComputeMetricsForNER, ComputeMetricsForNestedNER, extract_entities
 from torch.nn import LSTM
 
@@ -20,6 +22,7 @@ MODEL_CLASS = {
     'linear': BertForLinearHeadNER, 
     'linear_nested': BertForLinearHeadNestedNER,
     'crf': BertForCRFHeadNER,
+    'crf_nested': BertForCRFHeadNestedNER
 }
 
 def get_logger_and_args(logger_name: str, _args: List[str] = None):
@@ -81,7 +84,48 @@ def generate_testing_results(train_args, logger, predictions, test_dataset, for_
     with open(join(train_args.output_dir, "CMeEE_test.json"), "w", encoding="utf8") as f:
         json.dump(final_answer, f, indent=2, ensure_ascii=False)
         logger.info(f"`CMeEE_test.json` saved")
+        
+def AdamW_grouped_LLRD(model,init_lr):
+    ## ref: https://zhuanlan.zhihu.com/p/412889866
+    ## Base in the source ref is roberta
+    
+    opt_parameters = []       # To be passed to the optimizer (only parameters of the layers you want to update).
+    named_parameters = list(model.named_parameters()) 
 
+    # According to AAAMLP book by A. Thakur, we generally do not use any decay 
+    # for bias and LayerNorm.weight layers.
+    no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
+    set_2 = ["layer.4", "layer.5", "layer.6", "layer.7"]
+    set_3 = ["layer.8", "layer.9", "layer.10", "layer.11"]
+    # init_lr = 1e-6
+
+    for i, (name, params) in enumerate(named_parameters):  
+        print(name)
+        weight_decay = 0.0 if any(p in name for p in no_decay) else 0.01
+
+        if name.startswith("bert.embeddings") or name.startswith("bert.encoder"):            
+            # For first set, set lr to 1e-6 (i.e. 0.000001)
+            lr = init_lr       
+
+            # For set_2, increase lr to 0.00000175
+            lr = init_lr * 1.75 if any(p in name for p in set_2) else lr
+
+            # For set_3, increase lr to 0.0000035 
+            lr = init_lr * 3.5 if any(p in name for p in set_3) else lr
+
+            opt_parameters.append({"params": params,
+                                   "weight_decay": weight_decay,
+                                   "lr": lr})  
+
+        # For regressor and pooler, set lr to 0.0000036 (slightly higher than the top layer).                
+        if name.startswith("regressor") or name.startswith("bert.pooler"):               
+            lr = init_lr * 3.6 
+
+            opt_parameters.append({"params": params,
+                                   "weight_decay": weight_decay,
+                                   "lr": lr})    
+
+    return AdamW(opt_parameters, lr=init_lr)
 
 def main(_args: List[str] = None):
     # ===== Parse arguments =====
@@ -106,15 +150,35 @@ def main(_args: List[str] = None):
     # ===== Trainer =====
     compute_metrics = ComputeMetricsForNestedNER() if for_nested_ner else ComputeMetricsForNER()
     
-    trainer = Trainer(
-        model=model,
-        tokenizer=tokenizer,
-        args=train_args,
-        data_collator=CollateFnForEE(tokenizer.pad_token_id, for_nested_ner=for_nested_ner),
-        train_dataset=train_dataset,
-        eval_dataset=dev_dataset,
-        compute_metrics=compute_metrics,
-    )
+    if model_args.lr_decay:
+        ## ref: https://zhuanlan.zhihu.com/p/412889866, decay & warm_up
+        optimizer = AdamW_grouped_LLRD(model,train_args.learning_rate)
+        scheduler = get_scheduler(
+                    "cosine",
+                    optimizer = optimizer,
+                    num_warmup_steps = 50,
+                    num_training_steps = int(1e6)
+        )
+        trainer = Trainer(
+            model=model,
+            tokenizer=tokenizer,
+            args=train_args,
+            data_collator=CollateFnForEE(tokenizer.pad_token_id, for_nested_ner=for_nested_ner),
+            train_dataset=train_dataset,
+            eval_dataset=dev_dataset,
+            compute_metrics=compute_metrics,
+            optimizers = (optimizer,scheduler)
+        )
+    else:
+        trainer = Trainer(
+            model=model,
+            tokenizer=tokenizer,
+            args=train_args,
+            data_collator=CollateFnForEE(tokenizer.pad_token_id, for_nested_ner=for_nested_ner),
+            train_dataset=train_dataset,
+            eval_dataset=dev_dataset,
+            compute_metrics=compute_metrics,
+        )
 
     if train_args.do_train:
         try:

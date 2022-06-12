@@ -71,7 +71,7 @@ class InputExample:
                 end_idx = entity["end_idx"]
                 entity_type = entity["type"]
 
-                assert entity["entity"] == self.text[start_idx: end_idx + 1], f"{entity} mismatch: `{self.text}`"
+                assert entity["entity"] == self.text[start_idx: end_idx + 1], f"{self.entities} mismatch: `{self.text}`"
 
                 if not for_nested_ner:
                     _write_label(label, entity_type, start_idx, end_idx)
@@ -140,11 +140,13 @@ def _fusing_data(filename, data):
                 if start_idx == -1:
                     rm_idx.append(idx)
                 else:
+                    start_idx += pos_dict[e['entity']]
                     end_idx = start_idx + len(e['entity']) - 1
                     pos_dict[e['entity']] = end_idx + 1
                     e['start_idx'] = start_idx
                     e['end_idx'] = end_idx
-            for idx in rm_idx:
+            for idx in rm_idx[::-1]:
+                # print(new_data['entities'],idx)
                 new_data['entities'].pop(idx)
         data.append(new_data)
 

@@ -21,6 +21,10 @@ class ModelConstructArgs(_Args):
     model_path: Optional[str] = field(default=None, metadata={"help": "Pretrained model path"})
     init_model: Optional[int] = field(default=0, metadata={"choices": [0, 1], "help": "Init models' parameters"})
     
+    lr_decay: Optional[bool] = field(default=False, metadata={"help": "Whether to decay learning rate by layers"})
+    swa: Optional[bool] = field(default=False, metadata={"help": "Whether to use SWA"})
+    # warm_up: Optional[bool] = field(default=False, metadata={"help": "Whether to use lr warmup"}) # default in lr_decay
+    
 
 @dataclass
 class CBLUEDataArgs(_Args):
