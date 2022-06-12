@@ -2,7 +2,7 @@ CBLUE_ROOT=../data/CBLUEDatasets
   
 MODEL_TYPE=bert
 MODEL_PATH=../bert-base-chinese
-SEED=2022
+SEED=2023
 LABEL_NAMES=(labels)
 #TASK_ID=0
 
@@ -85,6 +85,8 @@ do
     --model_type                  ${MODEL_TYPE} \
     --model_path                  ${MODEL_PATH} \
     --head_type                   ${HEAD_TYPE} \
+    --lr_decay                    true \
+    --swa                         false \
     \
     --cblue_root                  ${CBLUE_ROOT} \
     --max_length                  512 \
