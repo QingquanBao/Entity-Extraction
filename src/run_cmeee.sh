@@ -33,16 +33,21 @@ do
     EVALBS=16
     LABEL_NAMES=(labels labels2)
     ;;
+  4)
+    HEAD_TYPE=linearadv
+    BS=4
+    EVALBS=16
+    ;;
   *)
     echo "Error ${TASK_ID}"
     exit -1
     ;;
   esac
 
-  OUTPUT_DIR=../ckpts/${MODEL_TYPE}_${HEAD_TYPE}_${SEED}
+  OUTPUT_DIR=../ckpts/${MODEL_TYPE}_${HEAD_TYPE}_${SEED}_lrdecay_adv
 
   PYTHONPATH=../.. \
-  CUDA_VISIBLE_DEVICES=0 python run_cmeee.py \
+  CUDA_VISIBLE_DEVICES=0 python -m pdb run_cmeee.py \
     --output_dir                  ${OUTPUT_DIR} \
     --report_to                   none \
     --overwrite_output_dir        true \
@@ -89,11 +94,16 @@ do
     --lr_decay                    true \
     --use_swa                     false \
     --swa_start                   6 \
-    --swa_lr                      2e-6 \ 
-    --use_pgd                     true \
+    --swa_lr                      2e-6 \
     \
     --cblue_root                  ${CBLUE_ROOT} \
     --max_length                  512 \
     --label_names                 ${LABEL_NAMES[@]} \
-    --fusion                      false 
+    --fusion                      false \
+    \
+    --use_pgd                     true \
+    --adv_eps                     1e-6 \
+    --adv_stepsize                1e-3 \
+    --adv_stepnum                 1 \
+    --adv_noisevar                1e-5
 done

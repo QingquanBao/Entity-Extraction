@@ -14,12 +14,13 @@ from args import ModelConstructArgs, CBLUEDataArgs
 from logger import get_logger
 from ee_data import EE_label2id2, EEDataset, EE_NUM_LABELS1, EE_NUM_LABELS2, EE_NUM_LABELS, CollateFnForEE, \
     EE_label2id1, NER_PAD, EE_label2id
-from model import BertForCRFHeadNER, BertForLinearHeadNER, BertForLinearHeadNestedNER, BertForCRFHeadNestedNER, CRFClassifier, LinearClassifier
+from model import BertForCRFHeadNER, BertForLinearHeadNER, BertForLinearHeadNERv2, BertForLinearHeadNestedNER, BertForCRFHeadNestedNER, CRFClassifier, LinearClassifier
 from metrics import ComputeMetricsForNER, ComputeMetricsForNestedNER, extract_entities
 from mytrainer import AdamW_grouped_LLRD, MyTrainer
 
 MODEL_CLASS = {
     'linear': BertForLinearHeadNER, 
+    'linearadv': BertForLinearHeadNERv2, 
     'linear_nested': BertForLinearHeadNestedNER,
     'crf': BertForCRFHeadNER,
     'crf_nested': BertForCRFHeadNestedNER

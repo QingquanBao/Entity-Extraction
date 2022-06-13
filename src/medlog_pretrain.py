@@ -2,7 +2,7 @@ import math
 from transformers import set_seed, BertTokenizer, Trainer, HfArgumentParser, TrainingArguments, BertLayer, BertModel, BertForMaskedLM
 
 import json
-from datasets import Dataset
+from datasets import Dataset, load_from_disk
 from transformers import DataCollatorForLanguageModeling
 
 
@@ -37,23 +37,24 @@ def cat_list(example):
     return out_.replace('病人：', '').replace('医生：', '')
 
 ## Dataset def 
-filename = '../data/train_data.json'
-with open(filename, encoding="utf8") as f:
-    data = json.load(f)
-
-data1 = [ cat_list(d) for d in data]
-data2 = {'train': data1}
-dataset = Dataset.from_dict(data2)
+#filename = '../data/train_data.json'
+#with open(filename, encoding="utf8") as f:
+#    data = json.load(f)
+#
+#data1 = [ cat_list(d) for d in data]
+#data2 = {'train': data1}
+#dataset = Dataset.from_dict(data2)
 
 
 tokenizer = BertTokenizer.from_pretrained('../bert-base-chinese')
 
-tokenized_datasets = dataset.map(
-    tokenize_function, batched=True,remove_columns=["train"],load_from_cache_file=True,writer_batch_size=10000
-)
-lm_datasets = tokenized_datasets.map(group_texts, batched=True,load_from_cache_file=True,writer_batch_size=10000)
-
-lm_datasets.save_to_disk('../data/lm_cache')
+#tokenized_datasets = dataset.map(
+#    tokenize_function, batched=True,remove_columns=["train"],load_from_cache_file=True,writer_batch_size=10000
+#)
+#lm_datasets = tokenized_datasets.map(group_texts, batched=True,load_from_cache_file=True,writer_batch_size=10000)
+#
+#lm_datasets.save_to_disk('../data/lm_cache')
+lm_datasets = load_from_disk('../data/lm_cache', keep_in_memory=True)
 
 data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm_probability=0.15)
 
@@ -80,10 +81,11 @@ training_args = TrainingArguments(
     fp16=True,
     logging_steps=logging_steps,
     save_steps=logging_steps // 4,
-    num_train_epochs=10
+    num_train_epochs=10,
+    resume_from_checkpoint='/dssg/home/acct-stu/stu907/cmeee/src/bert-finetuned-medlog/checkpoint-70000'
 )
 
-model = BertForMaskedLM.from_pretrained('../bert-base-chinese')
+model = BertForMaskedLM.from_pretrained('/dssg/home/acct-stu/stu907/cmeee/src/bert-finetuned-medlog/checkpoint-70000')
 
 trainer = Trainer(
     model=model,
@@ -93,10 +95,10 @@ trainer = Trainer(
     data_collator=data_collator,
 )
 
-eval_results = trainer.evaluate()
-print(f">>> Perplexity: {math.exp(eval_results['eval_loss']):.2f}")
+#eval_results = trainer.evaluate()
+#print(f">>> Perplexity: {math.exp(eval_results['eval_loss']):.2f}")
 
-trainer.train()
+trainer.train(resume_from_checkpoint=True)
 eval_results = trainer.evaluate()
 print(f">>> Perplexity: {math.exp(eval_results['eval_loss']):.2f}")
 

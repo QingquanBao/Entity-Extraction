@@ -39,8 +39,9 @@ class LinearClassifier(nn.Module):
     def _pred_labels(self, _logits):
         return torch.argmax(_logits, dim=-1)
 
-    def forward(self, hidden_states, labels=None, no_decode=False):
+    def forward(self, hidden_states, labels=None, no_decode=False, only_logits=False):
         _logits = self.layers(hidden_states)
+        if only_logits: return _logits
         loss, pred_labels = None, None
 
         if labels is None:
@@ -103,6 +104,86 @@ def _group_ner_outputs(output1: NEROutputs, output2: NEROutputs):
 
     return NEROutputs(grouped_loss, grouped_logits)
 
+class BertBasedModel(BertPreTrainedModel):
+    config_class = BertConfig
+    def __init__(self, config: BertConfig):
+        super().__init__(config) 
+        self.config = config
+        self.bert = BertModel(config)
+
+    def embed_encode(self, input_ids, token_type_ids=None, attention_mask=None):
+        if token_type_ids is None:
+            token_type_ids = torch.zeros_like(input_ids)
+        embedding_output = self.bert.embeddings(input_ids, token_type_ids)
+        return embedding_output
+
+    def encode(
+        self,
+        input_ids,
+        token_type_ids,
+        attention_mask,
+        inputs_embeds=None,
+    ):
+        outputs = self.bert(
+                input_ids=input_ids,
+                token_type_ids=token_type_ids,
+                attention_mask=attention_mask,
+                inputs_embeds=inputs_embeds,
+            )
+        last_hidden_state = outputs.last_hidden_state
+        all_hidden_states = outputs.hidden_states  # num_layers + 1 (embeddings)
+        return last_hidden_state, all_hidden_states
+
+class BertForLinearHeadNERv2(BertBasedModel):
+    config_class = BertConfig
+    base_model_prefix = "bert"
+
+    def __init__(self, config: BertConfig, num_labels1: int):
+        super().__init__(config)
+        self.config = config
+
+        self.bert = BertModel(config)
+
+        self.classifier = LinearClassifier(config.hidden_size, num_labels1, config.hidden_dropout_prob)
+        
+        self.init_weights()
+
+    def forward(
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            labels=None,
+            labels2=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
+            no_decode=False,
+            fwd_type=0,
+            embed=None
+    ):
+        if fwd_type == 0:
+            # Normal outputs
+            last_hidden_state, all_hidden_states = self.encode(
+                input_ids, token_type_ids, attention_mask
+            )
+            output = self.classifier.forward(last_hidden_state, labels, no_decode=no_decode)
+        elif fwd_type == 1:
+            # Only return Input Embeddings
+            return self.embed_encode(input_ids, token_type_ids, attention_mask)
+        elif fwd_type == 2:
+            # Forward w/ Input Embeddings
+            assert embed is not None
+            last_hidden_state, all_hidden_states = self.encode(
+                None, token_type_ids, attention_mask, embed
+            )
+
+            output = self.classifier.forward(last_hidden_state, labels, no_decode=no_decode, only_logits=True)
+
+        return output 
 
 class BertForLinearHeadNER(BertPreTrainedModel):
     config_class = BertConfig
