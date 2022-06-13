@@ -16,7 +16,7 @@ from ee_data import EE_label2id2, EEDataset, EE_NUM_LABELS1, EE_NUM_LABELS2, EE_
     EE_label2id1, NER_PAD, EE_label2id
 from model import BertForCRFHeadNER, BertForLinearHeadNER, BertForLinearHeadNestedNER, BertForCRFHeadNestedNER, CRFClassifier, LinearClassifier
 from metrics import ComputeMetricsForNER, ComputeMetricsForNestedNER, extract_entities
-from utils import AdamW_grouped_LLRD
+from mytrainer import AdamW_grouped_LLRD, MyTrainer
 
 MODEL_CLASS = {
     'linear': BertForLinearHeadNER, 
@@ -118,7 +118,7 @@ def main(_args: List[str] = None):
                     num_warmup_steps = 50,
                     num_training_steps = int(1e6)
         )
-        trainer = Trainer(
+        trainer = MyTrainer(
             model=model,
             tokenizer=tokenizer,
             args=train_args,
@@ -126,10 +126,11 @@ def main(_args: List[str] = None):
             train_dataset=train_dataset,
             eval_dataset=dev_dataset,
             compute_metrics=compute_metrics,
-            optimizers = (optimizer,scheduler)
+            optimizers = (optimizer,scheduler),
+            model_args = model_args
         )
     else:
-        trainer = Trainer(
+        trainer = MyTrainer(
             model=model,
             tokenizer=tokenizer,
             args=train_args,
@@ -137,6 +138,7 @@ def main(_args: List[str] = None):
             train_dataset=train_dataset,
             eval_dataset=dev_dataset,
             compute_metrics=compute_metrics,
+            model_args = model_args
         )
 
     if train_args.do_train:

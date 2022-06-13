@@ -177,7 +177,7 @@ class EEDataloader:
 
 
 class EEDataset(Dataset):
-    def __init__(self, cblue_root: str, mode: str, max_length: int, tokenizer, for_nested_ner: bool, fusion:bool):
+    def __init__(self, cblue_root: str, mode: str, max_length: int, tokenizer, for_nested_ner: bool, fusion:bool=False):
         self.cblue_root = cblue_root
         self.data_root = join(cblue_root, "CMeEE")
         self.max_length = max_length
