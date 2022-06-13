@@ -3,6 +3,7 @@ from transformers import set_seed, BertTokenizer
 from transformers.trainer import *
 from torch.optim.swa_utils import AveragedModel, SWALR
 
+from smart_perturb import SmartPerturbation
 from adversarial import FGM,PGD,FreeAT
 from args import ModelConstructArgs, CBLUEDataArgs
 
@@ -54,6 +55,18 @@ class MyTrainer(Trainer):
         self.model_args = model_args
         self.swa_model = AveragedModel(self.model).to(self.args.device) if model_args.use_swa else None
         self.swa_scheduler = SWALR(self.optimizer, swa_lr=self.args.swa_lr) if model_args.use_swa else None
+        if self.model_args.use_pgd:
+            self.adv = SmartPerturbation(num_label=20,
+                                        epsilon=self.model_args.adv_eps,
+                                        multi_gpu_on=False,
+                                        step_size=self.model_args.adv_stepsize,
+                                        noise_var=self.model_args.adv_noisevar,
+                                        norm_p="inf",
+                                        k=self.model_args.adv_stepnum,
+                                        fp16=False,
+                                        norm_level=0,)
+        else:
+            self.adv = None
         
     def train(
         self,
@@ -236,8 +249,10 @@ class MyTrainer(Trainer):
         # self.model_wrapped is DDP(Transformers Model), Deepspeed(Transformers Model), etc.
 
         # TODO: adversarial_training, model的接口适配(221:_warp_model)
-        if self.model_args.use_pgd:
-            adv = PGD(model=model, param_name='word_embeddings')
+        #if self.model_args.use_pgd:
+        #    #adv = PGD(model=model, param_name='word_embeddings')
+        #    adv = SmartPerturbation()
+
         
         # Train!
         num_examples = (
@@ -363,8 +378,8 @@ class MyTrainer(Trainer):
                     tr_loss_step = self.training_step(model, inputs)
                     
                 # TODO: adverserial training, 该步骤进行的位置是否正确, 2nd参数对应的是什么变量
-                if self.use_pgd:
-                    adv.adversarial_training(args,inputs,self.optimizer)
+                #if self.use_pgd:
+                #    adv.adversarial_training(args,inputs,self.optimizer)
 
                 if args.logging_nan_inf_filter and (torch.isnan(tr_loss_step) or torch.isinf(tr_loss_step)):
                     # if loss is nan or inf simply add the average of previous logged losses
@@ -509,3 +524,67 @@ class MyTrainer(Trainer):
         self.control = self.callback_handler.on_train_end(args, self.state, self.control)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
+
+    def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
+        """
+        Perform a training step on a batch of inputs.
+
+        Subclass and override to inject custom behavior.
+
+        Args:
+            model (:obj:`nn.Module`):
+                The model to train.
+            inputs (:obj:`Dict[str, Union[torch.Tensor, Any]]`):
+                The inputs and targets of the model.
+
+                The dictionary will be unpacked before being fed to the model. Most models expect the targets under the
+                argument :obj:`labels`. Check your model's documentation for all accepted arguments.
+
+        Return:
+            :obj:`torch.Tensor`: The tensor with training loss on this batch.
+        """
+        model.train()
+        inputs = self._prepare_inputs(inputs)
+        labels = inputs['labels']
+
+        if is_sagemaker_mp_enabled():
+            scaler = self.scaler if self.use_amp else None
+            loss_mb = smp_forward_backward(model, inputs, self.args.gradient_accumulation_steps, scaler=scaler)
+            return loss_mb.reduce_mean().detach().to(self.args.device)
+
+        if self.use_amp:
+            with autocast():
+                loss = self.compute_loss(model, inputs)
+        else:
+            loss = self.compute_loss(model, inputs)
+
+        if self.adv is not None:
+            adv_loss = self.adv.forward(model=model,
+                                labels=labels,
+                                input_ids=inputs['input_ids'],
+                                token_type_ids=None,
+                                attention_mask=inputs['attention_mask'],)
+
+            loss += adv_loss
+
+        if self.args.n_gpu > 1:
+            loss = loss.mean()  # mean() to average on multi-gpu parallel training
+
+        if self.args.gradient_accumulation_steps > 1 and not self.deepspeed:
+            # deepspeed handles loss scaling by gradient_accumulation_steps in its `backward`
+            loss = loss / self.args.gradient_accumulation_steps
+
+
+
+        if self.use_amp:
+            self.scaler.scale(loss).backward()
+        elif self.use_apex:
+            with amp.scale_loss(loss, self.optimizer) as scaled_loss:
+                scaled_loss.backward()
+        elif self.deepspeed:
+            # loss gets scaled under gradient_accumulation_steps in deepspeed
+            loss = self.deepspeed.backward(loss)
+        else:
+            loss.backward()
+
+        return loss.detach()

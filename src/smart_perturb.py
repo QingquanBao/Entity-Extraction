@@ -7,7 +7,6 @@ import random
 from torch.nn import Parameter, CrossEntropyLoss
 import torch.nn.functional as F
 
-logger = logging.getLogger(__name__)
 
 def stable_kl(logit, target, epsilon=1e-6, reduce=True):
     logit = logit.view(-1, logit.size(-1)).float()
@@ -32,6 +31,7 @@ def generate_noise(embed, mask, epsilon=1e-5):
 class SmartPerturbation:
     def __init__(
         self,
+        num_label,
         epsilon=1e-6,
         multi_gpu_on=False,
         step_size=1e-3,
@@ -39,10 +39,10 @@ class SmartPerturbation:
         norm_p="inf",
         k=1,
         fp16=False,
-        loss_map=[],
         norm_level=0,
     ):
         super(SmartPerturbation, self).__init__()
+        self.NUM_LABEL = num_label
         self.epsilon = epsilon
         # eta
         self.step_size = step_size
@@ -53,9 +53,7 @@ class SmartPerturbation:
         self.noise_var = noise_var
         self.norm_p = norm_p
         #self.encoder_type = encoder_type
-        self.loss_map = loss_map
         self.norm_level = norm_level > 0
-        assert len(loss_map) > 0
 
     def _norm_grad(self, grad, eff_grad=None, sentence_level=False):
         if self.norm_p == "l2":
@@ -84,11 +82,13 @@ class SmartPerturbation:
     def forward(
         self,
         model,
-        logits,
+        labels,
         input_ids,
         token_type_ids,
         attention_mask,
     ):
+
+        logits = F.one_hot(labels.flatten(), self.NUM_LABEL)
         # adv training
         
         vat_args = {
@@ -106,7 +106,7 @@ class SmartPerturbation:
                 'input_ids':input_ids,
                 'attention_mask':attention_mask,
                 'token_type_ids':token_type_ids,
-                'fwd_type':1,
+                'fwd_type':2,
                 'embed': embed+noise
             }
             adv_logits = model(**vat_args)
@@ -135,5 +135,5 @@ class SmartPerturbation:
         adv_logits = model(**vat_args)
         adv_lc = CrossEntropyLoss()
         #adv_loss = adv_lc(logits, adv_logits, ignore_index=-1)
-        adv_loss = adv_lc(adv_logits.flatten(0, -2), logits.flatten())
-        return adv_loss, embed.detach().abs().mean(), eff_noise.detach().abs().mean()
+        adv_loss = adv_lc(adv_logits.flatten(0, -2), labels.flatten())
+        return adv_loss #, embed.detach().abs().mean() #, eff_noise.detach().abs().mean()
