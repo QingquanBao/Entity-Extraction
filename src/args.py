@@ -22,13 +22,16 @@ class ModelConstructArgs(_Args):
     init_model: Optional[int] = field(default=0, metadata={"choices": [0, 1], "help": "Init models' parameters"})
     
     lr_decay: Optional[bool] = field(default=False, metadata={"help": "Whether to decay learning rate by layers"})
-    swa: Optional[bool] = field(default=False, metadata={"help": "Whether to use SWA"})
+    use_swa: Optional[bool] = field(default=False, metadata={"help": "Whether to use SWA"})
+    swa_start: Optional[int] = field(default=6, metadata={"help": "Start epoch of SWA"})
+    swa_lr: Optional[float] = field(default=2e-6, metadata={"help": "SWA learning rate"})
     # warm_up: Optional[bool] = field(default=False, metadata={"help": "Whether to use lr warmup"}) # default in lr_decay
     
-
+    use_pgd: Optional[bool] = field(default=False, metadata={"help": "Whether to use PGD"})
 @dataclass
 class CBLUEDataArgs(_Args):
     cblue_root: str = field(metadata={"help": "CBLUE data root"})
     max_length: Optional[int] = field(default=128, metadata={"help": "Max sequence length"})
     fusion: Optional[bool] = field(default=False, metadata={"help": "Whether to use data fusion"})
 
+    fusion: Optional[bool] = field(default=False, metadata={"help": "Whether to fuse input"})

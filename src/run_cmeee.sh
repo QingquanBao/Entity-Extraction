@@ -3,7 +3,7 @@ CBLUE_ROOT=../data/CBLUEDatasets
   
 MODEL_TYPE=bert
 MODEL_PATH=../bert-base-chinese
-SEED=2023
+SEED=2024
 LABEL_NAMES=(labels)
 #TASK_ID=0
 
@@ -42,7 +42,7 @@ do
   OUTPUT_DIR=../ckpts/${MODEL_TYPE}_${HEAD_TYPE}_${SEED}
 
   PYTHONPATH=../.. \
-  CUDA_VISIBLE_DEVICES=1 python run_cmeee.py \
+  CUDA_VISIBLE_DEVICES=0 python run_cmeee.py \
     --output_dir                  ${OUTPUT_DIR} \
     --report_to                   none \
     --overwrite_output_dir        true \
@@ -86,8 +86,11 @@ do
     --model_type                  ${MODEL_TYPE} \
     --model_path                  ${MODEL_PATH} \
     --head_type                   ${HEAD_TYPE} \
-    --lr_decay                    false \
-    --swa                         false \
+    --lr_decay                    true \
+    --use_swa                     false \
+    --swa_start                   6 \
+    --swa_lr                      2e-6 \ 
+    --use_pgd                     true \
     \
     --cblue_root                  ${CBLUE_ROOT} \
     --max_length                  512 \
