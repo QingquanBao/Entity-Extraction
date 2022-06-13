@@ -3,7 +3,7 @@ from transformers import set_seed, BertTokenizer
 from transformers.trainer import *
 from torch.optim.swa_utils import AveragedModel, SWALR
 
-from adversarial import FGM,PGD,FreeAT
+from adversarial import FGM,PGD
 from args import ModelConstructArgs, CBLUEDataArgs
 
 def AdamW_grouped_LLRD(model,init_lr):
@@ -421,7 +421,7 @@ class MyTrainer(Trainer):
 
                     # TODO: run SWA
                     # if optimizer_was_run and not self.deepspeed:
-                    #     self.lr_scheduler.step()
+                    #     self.lr_scheduler.step
                     if optimizer_was_run:
                         if self.model_args.use_swa and epoch >= self.model_args.swa_start:            
                             self.swa_model.update_parameters(model)  # To update parameters of the averaged model.
@@ -509,3 +509,53 @@ class MyTrainer(Trainer):
         self.control = self.callback_handler.on_train_end(args, self.state, self.control)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
+    
+    def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
+        """
+        Perform a training step on a batch of inputs.
+
+        Subclass and override to inject custom behavior.
+
+        Args:
+            model (:obj:`nn.Module`):
+                The model to train.
+            inputs (:obj:`Dict[str, Union[torch.Tensor, Any]]`):
+                The inputs and targets of the model.
+
+                The dictionary will be unpacked before being fed to the model. Most models expect the targets under the
+                argument :obj:`labels`. Check your model's documentation for all accepted arguments.
+
+        Return:
+            :obj:`torch.Tensor`: The tensor with training loss on this batch.
+        """
+        model.train()
+        inputs = self._prepare_inputs(inputs)
+
+        if is_sagemaker_mp_enabled():
+            scaler = self.scaler if self.use_amp else None
+            loss_mb = smp_forward_backward(model, inputs, self.args.gradient_accumulation_steps, scaler=scaler)
+            return loss_mb.reduce_mean().detach().to(self.args.device)
+
+        if self.use_amp:
+            with autocast():
+                loss = self.compute_loss(model, inputs)
+        else:
+            loss = self.compute_loss(model, inputs)
+
+        if self.args.n_gpu > 1:
+            loss = loss.mean()  # mean() to average on multi-gpu parallel training
+
+        if self.args.gradient_accumulation_steps > 1 and not self.deepspeed:
+            # deepspeed handles loss scaling by gradient_accumulation_steps in its `backward`
+            loss = loss / self.args.gradient_accumulation_steps
+
+        if self.use_amp:
+            self.scaler.scale(loss).backward()
+        elif self.use_apex:
+            with amp.scale_loss(loss, self.optimizer) as scaled_loss:
+                scaled_loss.backward()
+        elif self.deepspeed:
+            # loss gets scaled under gradient_accumulation_steps in deepspeed
+            loss = self.deepspeed.backward(loss)
+        else:
+            loss.backward()
