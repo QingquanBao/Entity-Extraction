@@ -100,4 +100,4 @@ trainer.train()
 eval_results = trainer.evaluate()
 print(f">>> Perplexity: {math.exp(eval_results['eval_loss']):.2f}")
 
-torch.save(model.state_dict(), 'my_pretrain/01.bin')
+torch.save(model.bert.state_dict(), 'my_pretrain/01.bin')

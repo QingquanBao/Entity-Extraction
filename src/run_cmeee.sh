@@ -1,3 +1,4 @@
+#!/bin/bash
 CBLUE_ROOT=../data/CBLUEDatasets
   
 MODEL_TYPE=bert
@@ -6,7 +7,7 @@ SEED=2024
 LABEL_NAMES=(labels)
 #TASK_ID=0
 
-for TASK_ID in 3  
+for TASK_ID in 0  
 do
   echo ${TASK_ID}
   case ${TASK_ID} in
