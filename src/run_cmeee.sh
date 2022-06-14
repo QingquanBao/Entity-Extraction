@@ -42,6 +42,7 @@ do
     HEAD_TYPE=crf_nested_adv
     BS=4
     EVALBS=16
+    LABEL_NAMES=(labels labels2)
     ;;
   *)
     echo "Error ${TASK_ID}"
@@ -72,7 +73,7 @@ do
     --max_grad_norm               0.5 \
     --lr_scheduler_type           cosine \
     \
-    --num_train_epochs            2 \
+    --num_train_epochs            10 \
     --warmup_ratio                0.05 \
     --logging_dir                 ${OUTPUT_DIR} \
     \
@@ -107,6 +108,7 @@ do
     --fusion                      false \
     \
     --use_pgd                     true \
+    --adv_weight                  10 \
     --adv_eps                     1e-6 \
     --adv_stepsize                1e-3 \
     --adv_stepnum                 1 \
