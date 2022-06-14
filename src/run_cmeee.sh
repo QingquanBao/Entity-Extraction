@@ -38,6 +38,11 @@ do
     BS=4
     EVALBS=16
     ;;
+  5)
+    HEAD_TYPE=crf_nested_adv
+    BS=4
+    EVALBS=16
+    ;;
   *)
     echo "Error ${TASK_ID}"
     exit -1
@@ -49,7 +54,7 @@ do
   PYTHONPATH=../.. \
   CUDA_VISIBLE_DEVICES=0 python -m pdb run_cmeee.py \
     --output_dir                  ${OUTPUT_DIR} \
-    --report_to                   none \
+    --report_to                   wandb \
     --overwrite_output_dir        true \
     \
     --do_train                    true \
