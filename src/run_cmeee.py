@@ -14,7 +14,7 @@ from args import ModelConstructArgs, CBLUEDataArgs
 from logger import get_logger
 from ee_data import EE_label2id2, EEDataset, EE_NUM_LABELS1, EE_NUM_LABELS2, EE_NUM_LABELS, CollateFnForEE, \
     EE_label2id1, NER_PAD, EE_label2id
-from model import BertForCRFHeadNER, BertForLinearHeadNER, BertForLinearHeadNERv2, BertForLinearHeadNestedNER, BertForCRFHeadNestedNER, BertForCRFHeadNestedNERv2, CRFClassifier, LinearClassifier
+from model import BertForCRFHeadNER, BertForLinearHeadNER, BertForLinearHeadNERv2, BertForLinearHeadNestedNER, BertForLinearHeadNestedNERv2,  BertForCRFHeadNestedNER, BertForCRFHeadNestedNERv2, CRFClassifier, LinearClassifier
 from metrics import ComputeMetricsForNER, ComputeMetricsForNestedNER, extract_entities
 from mytrainer import AdamW_grouped_LLRD, MyTrainer
 import wandb
@@ -151,6 +151,8 @@ def main(_args: List[str] = None):
             compute_metrics=compute_metrics,
             optimizers = (optimizer,scheduler),
             model_args = model_args,
+            num_label=EE_NUM_LABELS1 if 'nest' in model_args.head_type else EE_NUM_LABELS,
+            num_label2=EE_NUM_LABELS2 if 'nest' in model_args.head_type else 0
         )
     else:
         trainer = MyTrainer(
@@ -162,6 +164,8 @@ def main(_args: List[str] = None):
             eval_dataset=dev_dataset,
             compute_metrics=compute_metrics,
             model_args = model_args,
+            num_label=EE_NUM_LABELS1 if 'nest' in model_args.head_type else EE_NUM_LABELS,
+            num_label2=EE_NUM_LABELS2 if 'nest' in model_args.head_type else 0
         )
 
     if train_args.do_train:

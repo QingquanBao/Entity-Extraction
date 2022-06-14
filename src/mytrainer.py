@@ -50,13 +50,14 @@ def AdamW_grouped_LLRD(model,init_lr):
     return AdamW(opt_parameters, lr=init_lr)
 
 class MyTrainer(Trainer):
-    def __init__(self,model_args: ModelConstructArgs,**kwargs):
+    def __init__(self,model_args: ModelConstructArgs, num_label, num_label2, **kwargs):
         super().__init__(**kwargs)
         self.model_args = model_args
         self.swa_model = AveragedModel(self.model).to(self.args.device) if model_args.use_swa else None
         self.swa_scheduler = SWALR(self.optimizer, swa_lr=self.args.swa_lr) if model_args.use_swa else None
         if self.model_args.use_pgd:
-            self.adv = SmartPerturbation(num_label=20,
+            self.adv = SmartPerturbation(num_label=num_label,
+                                        num_label2=num_label2,
                                         epsilon=self.model_args.adv_eps,
                                         multi_gpu_on=False,
                                         step_size=self.model_args.adv_stepsize,
@@ -65,6 +66,7 @@ class MyTrainer(Trainer):
                                         k=self.model_args.adv_stepnum,
                                         fp16=False,
                                         norm_level=0,)
+            self.adv_weight = model_args.adv_weight
         else:
             self.adv = None
         
@@ -547,6 +549,7 @@ class MyTrainer(Trainer):
         model.train()
         inputs = self._prepare_inputs(inputs)
         labels = inputs['labels']
+        labels2 = inputs['labels2'] if 'labels2' in inputs.keys() else None
 
         if is_sagemaker_mp_enabled():
             scaler = self.scaler if self.use_amp else None
@@ -562,11 +565,12 @@ class MyTrainer(Trainer):
         if self.adv is not None:
             adv_loss = self.adv.forward(model=model,
                                 labels=labels,
+                                labels2=labels2,
                                 input_ids=inputs['input_ids'],
                                 token_type_ids=None,
                                 attention_mask=inputs['attention_mask'],)
 
-            loss += adv_loss
+            loss += adv_loss * self.adv_weight
 
         if self.args.n_gpu > 1:
             loss = loss.mean()  # mean() to average on multi-gpu parallel training

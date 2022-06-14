@@ -68,26 +68,27 @@ class CRFClassifier(nn.Module):
 
         self.crf    = CRF(num_labels, batch_first=True)
 
-    def _pred_labels(self, emissions, mask):
+    def _pred_labels(self, emissions, mask, padding_value):
 
         pred_labels = self.crf.decode(emissions, mask.byte())
         out_ = pad_sequence([torch.tensor(pred_label, device=emissions.device) for pred_label in pred_labels],
-                             batch_first=True)
+                             batch_first=True, padding_value=padding_value)
         return out_
 
-    def forward(self, hidden_states, attention_mask, labels=None, no_decode=False, label_pad_token_id=NER_PAD_ID):    
+    def forward(self, hidden_states, attention_mask, labels=None, no_decode=False, label_pad_token_id=NER_PAD_ID, only_logits=False):    
       
         _emissions = self.layers(hidden_states)
+        if only_logits: return _emissions
         loss, pred_labels = None, None
 
         if labels is None:
             # Test dataset 
-            pred_labels = self._pred_labels(_emissions, attention_mask)    
+            pred_labels = self._pred_labels(_emissions, attention_mask, padding_value=label_pad_token_id)    
         else:
             loss = -1 * self.crf(_emissions, labels, mask=attention_mask.byte())
             if not no_decode:
                 # Validation set
-                pred_labels = self._pred_labels(_emissions, attention_mask)
+                pred_labels = self._pred_labels(_emissions, attention_mask, padding_value=label_pad_token_id)
 
         return NEROutputs(loss, pred_labels)
 
@@ -133,21 +134,7 @@ class BertBasedModel(BertPreTrainedModel):
         last_hidden_state = outputs.last_hidden_state
         all_hidden_states = outputs.hidden_states  # num_layers + 1 (embeddings)
         return last_hidden_state, all_hidden_states
-
-class BertForLinearHeadNERv2(BertBasedModel):
-    config_class = BertConfig
-    base_model_prefix = "bert"
-
-    def __init__(self, config: BertConfig, num_labels1: int):
-        super().__init__(config)
-        self.config = config
-
-        self.bert = BertModel(config)
-
-        self.classifier = LinearClassifier(config.hidden_size, num_labels1, config.hidden_dropout_prob)
-        
-        self.init_weights()
-
+    
     def forward(
             self,
             input_ids=None,
@@ -163,14 +150,14 @@ class BertForLinearHeadNERv2(BertBasedModel):
             return_dict=None,
             no_decode=False,
             fwd_type=0,
-            embed=None
+            embed=None,
     ):
         if fwd_type == 0:
             # Normal outputs
             last_hidden_state, all_hidden_states = self.encode(
                 input_ids, token_type_ids, attention_mask
             )
-            output = self.classifier.forward(last_hidden_state, labels, no_decode=no_decode)
+            output = self.hidden2out(last_hidden_state, attention_mask=attention_mask, labels=labels, labels2=labels2, no_decode=no_decode)
         elif fwd_type == 1:
             # Only return Input Embeddings
             return self.embed_encode(input_ids, token_type_ids, attention_mask)
@@ -181,9 +168,101 @@ class BertForLinearHeadNERv2(BertBasedModel):
                 None, token_type_ids, attention_mask, embed
             )
 
-            output = self.classifier.forward(last_hidden_state, labels, no_decode=no_decode, only_logits=True)
+            output = self.hidden2out(last_hidden_state, attention_mask=attention_mask, labels=labels, labels2=labels2, no_decode=no_decode, only_logits=True)
 
         return output 
+
+    def hidden2out(
+                    self, 
+                    hiddens, 
+                    labels,
+                    labels2=None, 
+                    no_decode=False, 
+                    only_logits=False):
+        pass
+
+class BertForLinearHeadNERv2(BertBasedModel):
+    config_class = BertConfig
+    base_model_prefix = "bert"
+
+    def __init__(self, config: BertConfig, num_labels1: int):
+        super().__init__(config)
+        self.config = config
+
+        self.bert = BertModel(config)
+
+        self.classifier = LinearClassifier(config.hidden_size, num_labels1, config.hidden_dropout_prob)
+        
+        self.init_weights()
+
+    def hidden2out(self, 
+                    hidden,
+                    attention_mask,
+                    labels, 
+                    labels2=None, 
+                    no_decode=False, 
+                    only_logits=False):
+        return self.classifier(hidden, labels, no_decode=no_decode, only_logits=only_logits)
+
+class BertForCRFHeadNestedNERv2(BertBasedModel):
+    config_class = BertConfig
+    base_model_prefix = "bert"
+
+    def __init__(self, config: BertConfig, num_labels1: int, num_labels2: int):
+        super().__init__(config)
+        self.config = config
+
+        self.bert = BertModel(config)
+
+        self.classifier1 = CRFClassifier(config.hidden_size, num_labels1, config.hidden_dropout_prob)
+        self.classifier2 = CRFClassifier(config.hidden_size, num_labels2, config.hidden_dropout_prob)
+
+        self.init_weights()
+    
+    def hidden2out(
+                    self, 
+                    hiddens, 
+                    attention_mask,
+                    labels=None,
+                    labels2=None, 
+                    no_decode=False, 
+                    only_logits=False):
+        out1 = self.classifier1(hiddens, attention_mask, labels, no_decode=no_decode, only_logits=only_logits)
+        out2 = self.classifier2(hiddens, attention_mask, labels2, no_decode=no_decode, only_logits=only_logits)
+        if only_logits:
+            return (out1, out2)
+        else:
+            return _group_ner_outputs(out1, out2)
+
+class BertForLinearHeadNestedNERv2(BertBasedModel):
+    config_class = BertConfig
+    base_model_prefix = "bert"
+
+    def __init__(self, config: BertConfig, num_labels1: int, num_labels2: int):
+        super().__init__(config)
+        self.config = config
+
+        self.bert = BertModel(config)
+
+        self.classifier1 = LinearClassifier(config.hidden_size, num_labels1, config.hidden_dropout_prob)
+        self.classifier2 = LinearClassifier(config.hidden_size, num_labels2, config.hidden_dropout_prob)
+
+        self.init_weights()
+
+    def hidden2out(
+                    self, 
+                    hiddens, 
+                    attention_mask,
+                    labels=None,
+                    labels2=None, 
+                    no_decode=False, 
+                    only_logits=False):
+        out1 = self.classifier1(hiddens,  labels, no_decode=no_decode, only_logits=only_logits)
+        out2 = self.classifier2(hiddens,  labels2, no_decode=no_decode, only_logits=only_logits)
+        if only_logits:
+            return out1, out2
+        else:
+            return _group_ner_outputs(out1, out2)
 
 class BertForLinearHeadNER(BertPreTrainedModel):
     config_class = BertConfig

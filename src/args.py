@@ -27,6 +27,7 @@ class ModelConstructArgs(_Args):
     swa_lr: Optional[float] = field(default=2e-6, metadata={"help": "SWA learning rate"})
     # warm_up: Optional[bool] = field(default=False, metadata={"help": "Whether to use lr warmup"}) # default in lr_decay
     use_pgd: Optional[bool] = field(default=False, metadata={"help": "Whether to use PGD"})
+    adv_weight: Optional[float] = field(default=1., metadata={"help": ""})
     adv_eps: Optional[float] = field(default=1e-6, metadata={"help": ""})
     adv_stepsize: Optional[float] = field(default=1e-3, metadata={"help": ""})
     adv_stepnum: Optional[int] = field(default=1, metadata={"help": ""})

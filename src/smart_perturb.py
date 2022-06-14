@@ -4,7 +4,7 @@ from copy import deepcopy
 import torch
 import logging
 import random
-from torch.nn import Parameter, CrossEntropyLoss
+from torch.nn import Parameter, CrossEntropyLoss, BCELoss
 import torch.nn.functional as F
 
 
@@ -32,6 +32,7 @@ class SmartPerturbation:
     def __init__(
         self,
         num_label,
+        num_label2=0,
         epsilon=1e-6,
         multi_gpu_on=False,
         step_size=1e-3,
@@ -43,6 +44,7 @@ class SmartPerturbation:
     ):
         super(SmartPerturbation, self).__init__()
         self.NUM_LABEL = num_label
+        self.NUM_LABEL2 = num_label2
         self.epsilon = epsilon
         # eta
         self.step_size = step_size
@@ -82,13 +84,16 @@ class SmartPerturbation:
     def forward(
         self,
         model,
-        labels,
-        input_ids,
-        token_type_ids,
-        attention_mask,
+        labels=None,
+        labels2=None,
+        input_ids=None,
+        token_type_ids=None,
+        attention_mask=None,
     ):
 
         logits = F.one_hot(labels.flatten(), self.NUM_LABEL)
+        if labels2 is not None:
+            logits2 = F.one_hot(labels2.flatten(), self.NUM_LABEL2)
         # adv training
         
         vat_args = {
@@ -111,7 +116,12 @@ class SmartPerturbation:
             }
             adv_logits = model(**vat_args)
             # Loss for classification
-            adv_loss = stable_kl(adv_logits, logits.detach(), reduce=False)
+            if labels2 is not None:
+                adv_loss = stable_kl(adv_logits[0], logits.detach(), reduce=False)
+                adv_loss += stable_kl(adv_logits[1], logits2.detach(), reduce=False)
+            else:
+                adv_loss = stable_kl(adv_logits, logits.detach(), reduce=False)
+
             (delta_grad,) = torch.autograd.grad(
                 adv_loss, noise, only_inputs=True, retain_graph=False
             )
@@ -135,5 +145,9 @@ class SmartPerturbation:
         adv_logits = model(**vat_args)
         adv_lc = CrossEntropyLoss()
         #adv_loss = adv_lc(logits, adv_logits, ignore_index=-1)
-        adv_loss = adv_lc(adv_logits.flatten(0, -2), labels.flatten())
+        if labels2 is not None:
+            adv_loss =  adv_lc(adv_logits[0].flatten(0, -2), labels.flatten())
+            adv_loss += adv_lc(adv_logits[1].flatten(0, -2), labels2.flatten())
+        else:
+            adv_loss = adv_lc(adv_logits.flatten(0, -2), labels.flatten())
         return adv_loss #, embed.detach().abs().mean() #, eff_noise.detach().abs().mean()
