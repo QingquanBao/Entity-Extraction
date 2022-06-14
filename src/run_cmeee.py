@@ -17,6 +17,9 @@ from ee_data import EE_label2id2, EEDataset, EE_NUM_LABELS1, EE_NUM_LABELS2, EE_
 from model import BertForCRFHeadNER, BertForLinearHeadNER, BertForLinearHeadNERv2, BertForLinearHeadNestedNER, BertForCRFHeadNestedNER, CRFClassifier, LinearClassifier
 from metrics import ComputeMetricsForNER, ComputeMetricsForNestedNER, extract_entities
 from mytrainer import AdamW_grouped_LLRD, MyTrainer
+import wandb
+
+wandb.init(project="Entity Extraction", entity="sjtu-kg")
 
 MODEL_CLASS = {
     'linear': BertForLinearHeadNER, 
@@ -90,6 +93,7 @@ def generate_testing_results(train_args, logger, predictions, test_dataset, for_
 def main(_args: List[str] = None):
     # ===== Parse arguments =====
     logger, train_args, model_args, data_args = get_logger_and_args(__name__, _args)
+    train_args.report_to = ['wandb']
 
     # ===== Set random seed =====
     set_seed(train_args.seed)
@@ -128,7 +132,7 @@ def main(_args: List[str] = None):
             eval_dataset=dev_dataset,
             compute_metrics=compute_metrics,
             optimizers = (optimizer,scheduler),
-            model_args = model_args
+            model_args = model_args,
         )
     else:
         trainer = MyTrainer(
@@ -139,7 +143,7 @@ def main(_args: List[str] = None):
             train_dataset=train_dataset,
             eval_dataset=dev_dataset,
             compute_metrics=compute_metrics,
-            model_args = model_args
+            model_args = model_args,
         )
 
     if train_args.do_train:

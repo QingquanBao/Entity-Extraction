@@ -471,7 +471,8 @@ class MyTrainer(Trainer):
             if self.control.should_training_stop:
                 break
         
-        torch.optim.swa_utils.update_bn(train_dataloader, self.swa_model)
+        if self.model_args.use_swa:
+            torch.optim.swa_utils.update_bn(train_dataloader, self.swa_model)
         
         if args.past_index and hasattr(self, "_past"):
             # Clean the state at the end of training
@@ -524,11 +525,7 @@ class MyTrainer(Trainer):
         self.control = self.callback_handler.on_train_end(args, self.state, self.control)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> adv_beta
     def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
         """
         Perform a training step on a batch of inputs.
@@ -549,10 +546,7 @@ class MyTrainer(Trainer):
         """
         model.train()
         inputs = self._prepare_inputs(inputs)
-<<<<<<< HEAD
-=======
         labels = inputs['labels']
->>>>>>> adv_beta
 
         if is_sagemaker_mp_enabled():
             scaler = self.scaler if self.use_amp else None

@@ -7,7 +7,7 @@ SEED=2024
 LABEL_NAMES=(labels)
 #TASK_ID=0
 
-for TASK_ID in 0  
+for TASK_ID in 4  
 do
   echo ${TASK_ID}
   case ${TASK_ID} in
@@ -67,7 +67,7 @@ do
     --max_grad_norm               0.5 \
     --lr_scheduler_type           cosine \
     \
-    --num_train_epochs            20 \
+    --num_train_epochs            2 \
     --warmup_ratio                0.05 \
     --logging_dir                 ${OUTPUT_DIR} \
     \
@@ -91,7 +91,7 @@ do
     --model_type                  ${MODEL_TYPE} \
     --model_path                  ${MODEL_PATH} \
     --head_type                   ${HEAD_TYPE} \
-    --lr_decay                    true \
+    --lr_decay                    false \
     --use_swa                     false \
     --swa_start                   6 \
     --swa_lr                      2e-6 \
