@@ -104,6 +104,7 @@ def main(_args: List[str] = None):
         'learning_rate',
         'lr_decay',
         'use_pgd',
+        'adv_weight',
         'adv_eps',
         'adv_stepsize',
         'adv_stepnum',
