@@ -39,3 +39,17 @@ python medlog_pretrain.py
     pages = "38--45"
 }
 ```
+
+```bibtex
+@inproceedings{jiang-etal-2020-smart,
+    title = "{SMART}: Robust and Efficient Fine-Tuning for Pre-trained Natural Language Models through Principled Regularized Optimization",
+    author = "Jiang, Haoming  and He, Pengcheng  and Chen, Weizhu  and Liu, Xiaodong  and Gao, Jianfeng  and Zhao, Tuo",
+    booktitle = "Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics",
+    month = jul,
+    year = "2020",
+    address = "Online",
+    publisher = "Association for Computational Linguistics",
+    doi = "10.18653/v1/2020.acl-main.197",
+    pages = "2177--2190",
+}
+```
