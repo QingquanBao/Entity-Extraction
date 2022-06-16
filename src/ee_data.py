@@ -7,7 +7,7 @@ from collections import Counter, defaultdict
 from itertools import repeat
 from os.path import join, exists
 from typing import List
-from random import choice, randint
+from random import choice, randint, random
 from copy import deepcopy
 
 import numpy as np
@@ -89,10 +89,10 @@ class InputExample:
                 return self.sentence_id, self.text, [label1, label2]
 
 
-def _fusing_data(filename, data):
+def _fusing_data(filename, data, fusion_type):
     # 只加训练集
     if 'train' in filename:
-        fused_num = 3000
+        fused_num = 5000
     else:
         fused_num = 0
     # 统计所有类型的entity
@@ -105,7 +105,7 @@ def _fusing_data(filename, data):
 
     for i in range(fused_num):
         # 两种增强方式
-        type = randint(1, 2)
+        type = 1 if random() < fusion_type else 2
         # 直接叠加在一起
         if type == 1:
             new_data = dict()
@@ -158,26 +158,26 @@ class EEDataloader:
         self.data_root = join(cblue_root, "CMeEE")
 
     @staticmethod
-    def _load_json(filename: str, fusion: bool=False) -> List[dict]:
+    def _load_json(filename: str, fusion: bool=False, fusion_type: float=0) -> List[dict]:
         with open(filename, encoding="utf8") as f:
             data = json.load(f)
-        return _fusing_data(filename, data) if fusion else data
+        return _fusing_data(filename, data, fusion_type) if fusion else data
 
     @staticmethod
     def _parse(cmeee_data: List[dict]) -> List[InputExample]:
         return [InputExample(sentence_id=str(i), **data) for i, data in enumerate(cmeee_data)]
 
-    def get_data(self, mode: str, fusion: bool):
+    def get_data(self, mode: str, fusion: bool, fusion_type: float=0):
         if mode not in ("train", "dev", "test"):
             raise ValueError(f"Unrecognized mode: {mode}")
         if mode == 'train':
-            return self._parse(self._load_json(join(self.data_root, f"CMeEE_{mode}.json"),fusion))
+            return self._parse(self._load_json(join(self.data_root, f"CMeEE_{mode}.json"),fusion, fusion_type))
         else:
             return self._parse(self._load_json(join(self.data_root, f"CMeEE_{mode}.json")))
 
 
 class EEDataset(Dataset):
-    def __init__(self, cblue_root: str, mode: str, max_length: int, tokenizer, for_nested_ner: bool, fusion:bool=False):
+    def __init__(self, cblue_root: str, mode: str, max_length: int, tokenizer, for_nested_ner: bool, fusion:bool=False, fusion_type:float=0):
         self.cblue_root = cblue_root
         self.data_root = join(cblue_root, "CMeEE")
         self.max_length = max_length
@@ -196,7 +196,7 @@ class EEDataset(Dataset):
                 self.examples, self.data = pickle.load(f)
             logger.info(f"Load cached data from {cache_file}")
         else:
-            self.examples = EEDataloader(cblue_root).get_data(mode,fusion) # get original data
+            self.examples = EEDataloader(cblue_root).get_data(mode,fusion, fusion_type) # get original data
             self.data = self._preprocess(self.examples, tokenizer) # preprocess
             with open(cache_file, 'wb') as f:
                 pickle.dump((self.examples, self.data), f)
