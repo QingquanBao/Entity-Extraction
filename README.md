@@ -1,3 +1,6 @@
+## Introduction
+Here we want to solve CMeEE (中文医学命名实体识别)in CBLUE (中文医学信息处理评测基准) issued by [TianChi](https://tianchi.aliyun.com/dataset/dataDetail?dataId=95414#1). Based on the BERT embedding and CRF layer, we add adversarial training (SMART algorithm), data augmentation, learning rate decay, and medical-corpus-pretraining to alleviate the overfitting in the baseline and achieve a better F-1 score in CMeEE.
+
 ## Environment
 We recommend using Anaconda to set the environment. After setting a virtual environment, run `pip install -r requirements.txt`.
 
@@ -32,6 +35,9 @@ The following args can control our experiments,
 ## Data Augmentation concerned Args
     --fusion                      [help: whether to use data augmentation]
     --fusion_type                 [help: the percentage of the augmented data over the whole ones]
+    
+## Learning rate decay
+    --lr_decay                    [help: whether to use learning-rate-decay]
 ```
 
 
