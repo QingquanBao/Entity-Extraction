@@ -40,6 +40,7 @@ def get_logger_and_args(logger_name: str, _args: List[str] = None):
         # 在4.6.0版本的transformers中无效
         if _log_name.startswith("transformers.trainer"):
             # Redirect other loggers' output
+            # Redirect other loggers' output
             _logger.addHandler(logger.handlers[0])
 
     logger.info(f"==== Train Arguments ==== {train_args.to_json_string()}")
@@ -101,6 +102,7 @@ def main(_args: List[str] = None):
 
     config_concerned = [
         'fusion',
+        'fusion_type',
         'learning_rate',
         'lr_decay',
         'use_pgd',
@@ -123,7 +125,7 @@ def main(_args: List[str] = None):
 
     # ===== Get datasets =====
     if train_args.do_train:
-        train_dataset = EEDataset(data_args.cblue_root, "train", data_args.max_length, tokenizer, for_nested_ner=for_nested_ner,fusion=data_args.fusion)
+        train_dataset = EEDataset(data_args.cblue_root, "train", data_args.max_length, tokenizer, for_nested_ner=for_nested_ner,fusion=data_args.fusion, fusion_type=data_args.fusion_type)
         dev_dataset = EEDataset(data_args.cblue_root, "dev", data_args.max_length, tokenizer, for_nested_ner=for_nested_ner)
         logger.info(f"Trainset: {len(train_dataset)} samples")
         logger.info(f"Devset: {len(dev_dataset)} samples")
