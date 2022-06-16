@@ -114,6 +114,7 @@ do
     --max_length                  512 \
     --label_names                 ${LABEL_NAMES[@]} \
     --fusion                      true \
+    --fusion_type                 0.5 \
     \
     --use_pgd                     false \
     --adv_weight                  10 \
