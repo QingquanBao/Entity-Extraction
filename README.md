@@ -20,26 +20,35 @@ then move the `src/bert-finetuned-medlog/pytorch_model.bin` into `bert-base-chin
 Attention: This may take over 12 hours in NVIDIA A100, so you should consider whether to use or not depending on your computation resources.
 
 ### Entity Extration
-To train and evaluate the best model as far as we know, run `bash src/run.sh`. If you have a better hyper parameter configurations, feel free to contact us or make an issue!!!
+To train and evaluate the best model as far as we know, run `bash src/run_cmeee.sh`. If you have a better hyper parameter configurations, feel free to contact us or make an issue!!!
 
 The following args can control our experiments,
 ```
 ## Adversarial concerned Args
-    --use_pgd                     [help: whether to use adversarial training]
-    --adv_weight                  [help: the weight of the Smooth-inducing adversarial regularizer]
-    --adv_eps                     [help: the epsilon region where we perturb the embedding vectors]
-    --adv_stepsize                [help: the projected gradient ascent (PGA) step size when we perturb the embedding vectors] 
-    --adv_stepnum                 [help: the iteration number when we perturb the embedding vectors by PGA]
-    --adv_noisevar                [help: the noise variance when we initialize the noise to perturb the embedding vectors by PGA]
+    --use_pgd                     [help: whether to use adversarial training, True in best args]
+    --adv_weight                  [help: the weight of the Smooth-inducing adversarial regularizer, 10 in best args]
+    --adv_eps                     [help: the epsilon region where we perturb the embedding vectors, 1e-5 in best args]
+    --adv_stepsize                [help: the projected gradient ascent (PGA) step size when we perturb the embedding vectors, 1e-3 in best args] 
+    --adv_stepnum                 [help: the iteration number when we perturb the embedding vectors by PGA, 5 in best args]
+    --adv_noisevar                [help: the noise variance when we initialize the noise to perturb the embedding vectors by PGA, 1e-5 in best args]
 
 ## Data Augmentation concerned Args
-    --fusion                      [help: whether to use data augmentation]
-    --fusion_type                 [help: the percentage of the augmented data over the whole ones]
+    --fusion                      [help: whether to use data augmentation, True in best args]
+    --fusion_type                 [help: the percentage of the augmented data over the whole ones, 0.5 in best args]
     
 ## Learning rate decay
-    --lr_decay                    [help: whether to use learning-rate-decay]
+    --lr_decay                    [help: whether to use learning-rate-decay, True in best args]
 ```
 
+This script intergrates training and evaluation routinues, and would exectue prediction after training reaches maximum number of epoches and generate `CMeEE_test.json` in a certain directory of `ckpts/`. 
+
+## User Authorization of Toolkits
+
+We use wandb and Huggingface in this experiment and you may have to be authorized on these kits to make full use of our script. 
+
+To join us in wandb during the training routine, first run `wandb init` in your console and get your authorization code, then we would invite you to our project.
+
+To use the data and pretraining routine of Huggingface.io, ...
 
 ## Reference
 ```bibtex
