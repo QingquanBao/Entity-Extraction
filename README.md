@@ -1,3 +1,6 @@
+## Environment
+We recommend using Anaconda to set the environment. After setting a virtual environment, run `pip install -r requirements.txt`.
+
 ## Dataset
 For pretraining with medical corpus, download [MedDialog](https://drive.google.com/drive/folders/11sglwm6-cY7gjeqlZaMxL_MDKDMLdhym) (here we choose 'processed-zh; version) and put it into `./data/train_data.json`
 
